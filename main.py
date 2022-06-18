@@ -12,7 +12,7 @@ from telegram import TelegramError, ReplyKeyboardMarkup, KeyboardButton
 from telegram import update as update_type
 from telegram.ext import Updater, Filters, MessageHandler
 from telegram.ext import callbackcontext
-from get_emoji import get_emoji
+from get_emoji import get_emoji, get_emoji_str
 
 from database import engine, User
 
@@ -29,6 +29,10 @@ handler = logging.FileHandler('main.log', encoding='utf-8')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+
+start_keyboard = keyboard = ReplyKeyboardMarkup(
+    [[KeyboardButton(text='Указать местоположение', request_location=True)]], resize_keyboard=True)
+main_keyboard = ReplyKeyboardMarkup([['Получить текущую погоду'], ['Помощь']], resize_keyboard=True)
 
 
 def check_env() -> bool:
@@ -95,84 +99,6 @@ def send_message(update: update_type,
         logger.info(f'Отправлено сообщение пользователю {chat_id} с текстом {text[:20]}...')
 
 
-def start(update: update_type, context: callbackcontext) -> None:
-    """Функция обработки команды /start.
-    отправляет пользователю сообщение и кдавиатуру с кнопкной «Отправить местоположение»."""
-    logger.info('Получена команда /start.')
-    text = 'Привет, отправь мне свое местоположение и я смогу присылать тебе погоду.'
-    keyboard = ReplyKeyboardMarkup(
-        [[KeyboardButton(text='Отправить местоположение', request_location=True)]], resize_keyboard=True)
-    send_message(update, context, text, keyboard)
-
-
-def get_coordinates(update: update_type, context: callbackcontext) -> None:
-    """Функция обработки сообщения с местоположением.
-    Извлекает широту и долготу из сообщения и передает функции create_update_user,
-    которая либо создает нового пользователя, либо обновляет координаты и отправляет погоду,
-    либо ничего не делает и отправляет сообщение «Ваше местоположение не изменилось».
-    """
-    logger.info('Получено сообщение с местоположением.')
-    chat_id = update.effective_chat.id
-    logger.info('Начато определение координат.')
-    try:
-        latitude = update.message.location.latitude
-        longitude = update.message.location.longitude
-    except Exception as e:
-        logger.error(f'Не удалось определить координаты пользователя {chat_id}. Ошибка: {e}.')
-    else:
-
-        logger.info(f'Определены координаты пользователя {chat_id}. Широта: {latitude}, долгота {longitude}.')
-        if create_update_user(chat_id, latitude, longitude):
-            get_weather(update, context)
-        else:
-            text = 'Ваше местоположение не изменилось.'
-            keyboard = ReplyKeyboardMarkup([['Получить погоду'], ['Настройки']], resize_keyboard=True)
-            send_message(update, context, text, keyboard)
-
-
-def get_weather(update: update_type, context: callbackcontext) -> None:
-    """Функция обработки сообщения с текстом «Получить погоду».
-    Функция либо делает запрос к API если данные устарели или еще не запрашивались,
-    либо берет данные последнего запроса в базе данных.
-    """
-    logger.info(f'Получена команда на получение погоды')
-    session = Session(bind=engine)
-    chat_id = update.effective_chat.id
-    user = session.query(User).get(chat_id)
-    session.close()
-    # Ситуация если пользователь не отправил местоположение, но отправил сообщение «Получить погоду»
-    if not user:
-        logger.error(f'Не найден пользователь {chat_id}.')
-        text = ('Сначала отправь мне свое местоположение '
-                'и я смогу присылать тебе погоду. Нажми кнопку «Отправить местоположение»')
-        keyboard = ReplyKeyboardMarkup(
-            [[KeyboardButton(text='Отправить местоположение', request_location=True)]], resize_keyboard=True)
-        send_message(update, context, text, keyboard)
-        return
-
-    latitude, longitude = user.latitude, user.longitude
-    # если для данного пользователя или местоположения еще не выполнялся запрос к API
-    if not user.last_response or datetime.now() - user.last_update > timedelta(hours=1):
-        logger.info(f'Для данного пользователя или местоположения еще не выполнялся запрос к API или данные устарели.')
-        response = get_response(latitude, longitude)
-        if not response:
-            text = 'Упс. Что-то пошло не так, попробуйте позже.'
-            keyboard = ReplyKeyboardMarkup([['Получить погоду'], ['Настройки']], resize_keyboard=True)
-            send_message(update, context, text, keyboard)
-            return
-        update_last_response(user.id, response)
-    # если запрос выполнялся и прошло меньше часа
-    else:
-        logger.info(f'С момента последнего запроса не прошел час, загружаем данные из базы данных.')
-        response = json.loads(user.last_response)
-
-    text = parse_weather(response)
-    if not text:
-        text = 'Упс. Что-то пошло не так, попробуйте позже.'
-    keyboard = ReplyKeyboardMarkup([['Получить погоду'], ['Настройки']], resize_keyboard=True)
-    send_message(update, context, text, keyboard)
-
-
 def get_response(latitude: float, longitude: float) -> Optional[dict]:
     """Функция которая делает запрос к API по адресу https://api.openweathermap.org/data/2.5/weather.
     """
@@ -211,7 +137,7 @@ def parse_weather(response: dict) -> Optional[str]:
     emoji = get_emoji(code)
     if not emoji:
         logger.error(f'Не удалось получить emoji для кода {code}.')
-        emoji = '❓'
+        emoji = get_emoji_str('U+2753')
     wind = ''
     if wind_speed <= 1.5:
         wind = 'Ветра нет'
@@ -223,12 +149,94 @@ def parse_weather(response: dict) -> Optional[str]:
         wind = 'Сильный ветер'
     elif 17.1 < wind_speed:
         wind = 'Шторм'
-    message = (f'🏙️ Погода в: {name}.\n'
+    message = (f'{get_emoji_str("U+1F3D9")} Погода в: {name}.\n'
                f'{emoji} {weather.capitalize()}.\n'
-               f'🌡️ Температура воздуха {temp}°C (ощущается как {temp_feels_like} °C).\n'
-               f'💧 Влажность {humidity}%.\n'
-               f'💨 {wind} (скорость {wind_speed} м/с).')
+               f'{get_emoji_str("U+1F321")}️ Температура воздуха {temp}°C (ощущается как {temp_feels_like} °C).\n'
+               f'{get_emoji_str("U+1F4A7")} Влажность {humidity}%.\n'
+               f'{get_emoji_str("U+1F4A8")} {wind} (скорость {wind_speed} м/с).')
     return message
+
+
+def handler_start(update: update_type, context: callbackcontext) -> None:
+    """Функция обработки команды /start.
+    отправляет пользователю сообщение и кдавиатуру с кнопкной «Отправить местоположение»."""
+    logger.info('Получена команда /start.')
+    text = 'Привет, отправь мне свое местоположение и я смогу присылать тебе погоду.'
+    send_message(update, context, text, start_keyboard)
+
+
+def handler_get_coordinates(update: update_type, context: callbackcontext) -> None:
+    """Функция обработки сообщения с местоположением.
+    Извлекает широту и долготу из сообщения и передает функции create_update_user,
+    которая либо создает нового пользователя, либо обновляет координаты и отправляет погоду,
+    либо ничего не делает и отправляет сообщение «Ваше местоположение не изменилось».
+    """
+    logger.info('Получено сообщение с местоположением.')
+    chat_id = update.effective_chat.id
+    logger.info('Начато определение координат.')
+    try:
+        latitude = update.message.location.latitude
+        longitude = update.message.location.longitude
+    except Exception as e:
+        logger.error(f'Не удалось определить координаты пользователя {chat_id}. Ошибка: {e}.')
+    else:
+
+        logger.info(f'Определены координаты пользователя {chat_id}. Широта: {latitude}, долгота {longitude}.')
+        if create_update_user(chat_id, latitude, longitude):
+            handler_get_weather(update, context)
+        else:
+            text = 'Ваше местоположение не изменилось.'
+            send_message(update, context, text, main_keyboard)
+
+
+def handler_get_weather(update: update_type, context: callbackcontext) -> None:
+    """Функция обработки сообщения с текстом «Получить текущую погоду».
+    Функция либо делает запрос к API если данные устарели или еще не запрашивались,
+    либо берет данные последнего запроса в базе данных.
+    """
+    logger.info(f'Получена команда на получение погоды')
+    session = Session(bind=engine)
+    chat_id = update.effective_chat.id
+    user = session.query(User).get(chat_id)
+    session.close()
+    # Ситуация если пользователь не отправил местоположение, но отправил сообщение «Получить текущую погоду»
+    if not user:
+        logger.error(f'Не найден пользователь {chat_id}.')
+        text = ('Сначала отправь мне свое местоположение '
+                'и я смогу присылать тебе погоду. Нажми кнопку «Отправить местоположение»')
+
+        send_message(update, context, text, start_keyboard)
+        return
+
+    latitude, longitude = user.latitude, user.longitude
+    # если для данного пользователя или местоположения еще не выполнялся запрос к API
+    if not user.last_response or datetime.now() - user.last_update > timedelta(hours=1):
+        logger.info(f'Для данного пользователя или местоположения еще не выполнялся запрос к API или данные устарели.')
+        response = get_response(latitude, longitude)
+        if not response:
+            text = 'Упс. Что-то пошло не так, попробуйте позже.'
+            send_message(update, context, text, main_keyboard)
+            return
+        update_last_response(user.id, response)
+    # если запрос выполнялся и прошло меньше часа
+    else:
+        logger.info(f'С момента последнего запроса не прошел час, загружаем данные из базы данных.')
+        response = json.loads(user.last_response)
+
+    text = parse_weather(response)
+    if not text:
+        text = 'Упс. Что-то пошло не так, попробуйте позже.'
+    send_message(update, context, text, main_keyboard)
+
+
+def handler_help(update: update_type, context: callbackcontext) -> None:
+    """Функция обработки сообщения с текстом «Помощь»."""
+    logger.info(f'Получена команда Помощь')
+    text = ('Бот позволяет получить погоду в текущем местоположении. '
+            'Если необходимо изменить местоположение - отправь боту новую геопозицию. '
+            'Погода берется с сайта https://openweathermap.org.\n'
+            'Автор: @podlev')
+    send_message(update, context, text, main_keyboard)
 
 
 def main() -> None:
@@ -239,15 +247,18 @@ def main() -> None:
 
     updater = Updater(token=TOKEN)
     dispatcher = updater.dispatcher
-    map_handler = MessageHandler(Filters.location, get_coordinates)
-    command_handler = MessageHandler(Filters.command(('/start',)), start)
-    weather_handler = MessageHandler(Filters.text(('Получить погоду',)), get_weather)
+    map_handler = MessageHandler(Filters.location, handler_get_coordinates)
+    command_handler = MessageHandler(Filters.command(('/start',)), handler_start)
+    weather_handler = MessageHandler(Filters.text(('Получить текущую погоду',)), handler_get_weather)
+    help_handler = MessageHandler(Filters.text(('Помощь',)), handler_help)
     dispatcher.add_handler(map_handler)
     dispatcher.add_handler(command_handler)
     dispatcher.add_handler(weather_handler)
+    dispatcher.add_handler(help_handler)
 
     updater.start_polling()
     updater.idle()
+    logger.info(f'Бот запущен')
 
 
 if __name__ == '__main__':

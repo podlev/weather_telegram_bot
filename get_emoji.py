@@ -58,9 +58,13 @@ EMOJI_CODE = {200: 'U+26C8',
 def get_emoji(code: int) -> Optional[str]:
     emoji_code = EMOJI_CODE.get(code)
     if emoji_code:
-        emoji_code = emoji_code.replace('U+', '')
-        return chr(int(emoji_code.lstrip("U+").zfill(8), 16))
+        return get_emoji_str(emoji_code)
     return None
+
+
+def get_emoji_str(emoji_code):
+    emoji_code = emoji_code.replace('U+', '')
+    return chr(int(emoji_code.lstrip("U+").zfill(8), 16))
 
 
 if __name__ == '__main__':
