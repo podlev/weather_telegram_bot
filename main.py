@@ -249,7 +249,8 @@ def main() -> None:
     dispatcher = updater.dispatcher
     map_handler = MessageHandler(Filters.location, handler_get_coordinates)
     command_handler = MessageHandler(Filters.command(('/start',)), handler_start)
-    weather_handler = MessageHandler(Filters.text(('Получить текущую погоду',)), handler_get_weather)
+    weather_handler = MessageHandler(Filters.text(('Получить текущую погоду',
+                                                   'Получить погоду', )), handler_get_weather)
     help_handler = MessageHandler(Filters.text(('Помощь',)), handler_help)
     dispatcher.add_handler(map_handler)
     dispatcher.add_handler(command_handler)
