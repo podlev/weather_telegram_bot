@@ -3,7 +3,7 @@
 Телеграм бот написанный на Python с использованием библиотеки [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot).
 
 ## Описание
-Бот написан с использованием  библиотеки [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot). Используется SQLAlchemy для хранения информации о пользователях и хранения выполненных запросов. Реализовано логгирование. Погода берется с сайта https://openweathermap.org.
+Бот написан с использованием  библиотеки [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot). Используется SQLAlchemy для хранения информации о пользователях и хранения выполненных запросов. Погода берется с сайта https://openweathermap.org.
 
 Бот в telegram: **@podlev_weather_bot**
 

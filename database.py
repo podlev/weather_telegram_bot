@@ -11,11 +11,13 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=True)
     created_date = Column(DateTime(), default=datetime.now)
-    last_update = Column(DateTime())
     latitude = Column(Float, default=None)
     longitude = Column(Float, default=None)
-    last_response = Column(String, default=None)
+    city = Column(String, nullable=True)
+    last_update = Column(DateTime())
+    last_message = Column(String, default=None)
 
 
 Base.metadata.create_all(engine)

@@ -52,7 +52,8 @@ EMOJI_CODE = {200: 'U+26C8',
               800: 'U+2600',
               801: 'U+1F324',
               802: 'U+2601',
-              803: 'U+2601'}
+              803: 'U+2601',
+              804: 'U+2601'}
 
 
 def get_emoji(code: int) -> Optional[str]:
@@ -62,8 +63,7 @@ def get_emoji(code: int) -> Optional[str]:
     return None
 
 
-def get_emoji_str(emoji_code):
-    emoji_code = emoji_code.replace('U+', '')
+def get_emoji_str(emoji_code: str) -> str:
     return chr(int(emoji_code.lstrip("U+").zfill(8), 16))
 
 
