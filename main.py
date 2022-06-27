@@ -18,6 +18,7 @@ from get_emoji import get_emoji, get_emoji_str
 load_dotenv()
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 API_KEY = os.getenv('API_KEY')
+ADMIN_ID = 177396046
 
 URL_WEATHER_API = 'https://api.openweathermap.org/data/2.5/forecast'
 
@@ -28,7 +29,6 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - '
 handler = logging.FileHandler('main.log', encoding='utf-8')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-
 
 start_keyboard = keyboard = ReplyKeyboardMarkup(
     [[KeyboardButton(text='Указать местоположение', request_location=True)]], resize_keyboard=True)
@@ -275,6 +275,25 @@ def handler_help(update: update_type, context: callbackcontext) -> None:
     send_message(update, context, text, main_keyboard)
 
 
+def handler_admin(update: update_type, context: callbackcontext) -> None:
+    """Функционал для админа."""
+    logger.info(f'Получена команда «/admin».')
+    chat_id = update.effective_chat.id
+    if chat_id == ADMIN_ID:
+        logger.info(f'Отправка информации админу от пользователях.')
+        session = Session(bind=engine)
+        users = session.query(User).all()
+        text = 'Информация о пользователях:\n'
+        for user in users:
+            text += f'Пользователь: @{user.name}, последнее обновление {user.last_update.strftime("%d.%m.%Y %H:%M")}\n'
+        send_message(update, context, text, main_keyboard)
+        session.close()
+    else:
+        logger.warning(f'Пользователь с id: {chat_id} хотел получить доступ к админ функционалу.')
+        text = 'Нет доступа к данному функционалу'
+        send_message(update, context, text, main_keyboard)
+
+
 def main() -> None:
     """Основная функция."""
     if not check_env():
@@ -288,9 +307,11 @@ def main() -> None:
     weather_handler = MessageHandler(Filters.text(('Получить текущую погоду',
                                                    'Получить погоду',)), handler_get_weather)
     help_handler = MessageHandler(Filters.text(('Помощь',)), handler_help)
+    admin_handler = MessageHandler(Filters.text(('admin',)), handler_admin)
     dispatcher.add_handler(map_handler)
     dispatcher.add_handler(command_handler)
     dispatcher.add_handler(weather_handler)
+    dispatcher.add_handler(admin_handler)
     dispatcher.add_handler(help_handler)
 
     updater.start_polling()

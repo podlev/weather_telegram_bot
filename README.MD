@@ -8,13 +8,18 @@
 Бот в telegram: **@podlev_weather_bot**
 
 ## Как запустить
-1. Установить зависимости
+1. Создать и активировать виртаульное окружение
+ ```
+python -m venv venv
+source venv/Scripts/activate
+```  
+2. Установить зависимости
 ```
 pip install -r requirements.txt
 ```
-2. Переименовать файл **.env.example** в **.env**
-3. В файле .env указать телеграм токен и API key с сайта https://openweathermap.org/
-4. Запустить скрипт
+3. Переименовать файл **.env.example** в **.env**
+4. В файле .env указать телеграм токен и API key с сайта https://openweathermap.org/
+5. Запустить скрипт
 ```
 python main.py
 ```
