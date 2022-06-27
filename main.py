@@ -130,54 +130,57 @@ def parse_weather(response: dict) -> Optional[str]:
     logger.info(f'Начат парсинг ответа от API. Response: {response}')
     try:
         city_name = response['city']['name']
+        time_shift = response['city']['timezone']
     except KeyError:
         city_name = 'Не определено'
+        time_shift = 0
         logger.error(f'Не удалось определить название населенного пункта. Response: {response}')
-    message = f'{get_emoji_str("U+1F3D9")} Погода на сегодня в: {city_name}.\n\n'
+    message = f'{get_emoji_str("U+1F3D9")} Погода в: {city_name}.\n\n'
 
     try:
-        for data in response.get('list'):
+        for data in response.get('list')[:8]:
             date = data['dt_txt']
-            real_date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+            real_date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S") + timedelta(seconds=time_shift)
             if real_date.day <= datetime.now().day:
-                weather = data['weather'][0]['description']
-                code = int(data['weather'][0]['id'])
-                temp = round(float(data['main']['temp']))
-                temp_feels_like = round(float(data['main']['feels_like']))
-                humidity = round(float(data['main']['humidity']))
-                wind_speed = float(data['wind']['speed'])
-                emoji = get_emoji(code)
-                # Получаем эмоджи для кода
-                if not emoji:
-                    logger.error(f'Не удалось получить emoji для кода {code}.')
-                    emoji = get_emoji_str('U+2753')
-                # Формируем сообщение о ветре
-                wind = ''
-                if wind_speed <= 1.5:
-                    wind = 'Ветра нет'
-                elif 1.5 < wind_speed <= 5.4:
-                    wind = 'Легкий ветерок'
-                elif 5.4 < wind_speed <= 10.7:
-                    wind = 'Ветер'
-                elif 10.7 < wind_speed <= 17.1:
-                    wind = 'Сильный ветер'
-                elif 17.1 < wind_speed:
-                    wind = 'Шторм'
-                # Формируем итоговое сообщение
-                message += (f'{get_emoji_str("U+1F558")} {real_date.strftime("%H:%M")}\n'
-                            f'{emoji} {weather.capitalize()}.\n'
-                            f'{get_emoji_str("U+1F321")} Температура {temp}°C (ощущается {temp_feels_like}°C).\n'
-                            f'{get_emoji_str("U+1F4A7")} Влажность {humidity}%.\n'
-                            f'{get_emoji_str("U+1F4A8")} {wind} ({wind_speed} м/с).\n\n')
+                today_text = 'Сегодня в'
             else:
-                break
+                today_text = 'Завтра в'
+            weather = data['weather'][0]['description']
+            code = int(data['weather'][0]['id'])
+            temp = round(float(data['main']['temp']))
+            temp_feels_like = round(float(data['main']['feels_like']))
+            humidity = round(float(data['main']['humidity']))
+            wind_speed = float(data['wind']['speed'])
+            emoji = get_emoji(code)
+            # Получаем эмоджи для кода
+            if not emoji:
+                logger.error(f'Не удалось получить emoji для кода {code}.')
+                emoji = get_emoji_str('U+2753')
+            # Формируем сообщение о ветре
+            wind = ''
+            if wind_speed <= 1.5:
+                wind = 'Ветра нет'
+            elif 1.5 < wind_speed <= 5.4:
+                wind = 'Легкий ветерок'
+            elif 5.4 < wind_speed <= 10.7:
+                wind = 'Ветер'
+            elif 10.7 < wind_speed <= 17.1:
+                wind = 'Сильный ветер'
+            elif 17.1 < wind_speed:
+                wind = 'Шторм'
+            # Формируем итоговое сообщение
+            message += (f'{get_emoji_str("U+1F558")} {today_text} {real_date.strftime("%H:%M")}\n'
+                        f'{emoji} {weather.capitalize()}.\n'
+                        f'{get_emoji_str("U+1F321")} Температура {temp}°C (ощущается {temp_feels_like}°C).\n'
+                        f'{get_emoji_str("U+1F4A7")} Влажность {humidity}%.\n'
+                        f'{get_emoji_str("U+1F4A8")} {wind} ({wind_speed} м/с).\n\n')
 
         sunrise = response['city'].get('sunrise')
         sunset = response['city'].get('sunset')
-        # timezone = response['city'].get('timezone')
+
         if all((sunrise, sunset)):
-            sunrise_time = datetime.fromtimestamp(sunrise).strftime('%H:%M')
-            sunset_time = datetime.fromtimestamp(sunset).strftime('%H:%M')
+            sunrise_time = datetime.fromtimestamp(sunrise + time_shift).strftime('%H:%M')
+            sunset_time = datetime.fromtimestamp(sunset + time_shift).strftime('%H:%M')
             message += (f'{get_emoji_str("U+1F31E")} Время рассвета: {sunrise_time} '
                         f'\n{get_emoji_str("U+1F31A")} Время заката: {sunset_time}')
         else:
